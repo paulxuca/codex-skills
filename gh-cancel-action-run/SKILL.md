@@ -39,7 +39,25 @@ PY
 )"
 ```
 
-If parsing fails or the remote is not GitHub, ask the user for `OWNER/REPO`.
+If parsing fails or the remote is not GitHub, fall back to `git remote -v` and retry parsing:
+
+```bash
+REMOTE_URL="$(
+  git remote -v | awk '/^origin\\s/ {print $2; exit}'
+)"
+OWNER_REPO="$(
+  python3 - <<'PY'
+import os, re, sys
+url = os.environ.get("REMOTE_URL", "")
+m = re.search(r"github\\.com[:/](.+?)(?:\\.git)?$", url)
+if not m:
+    sys.exit("Could not parse GitHub owner/repo from git remote -v")
+print(m.group(1))
+PY
+)"
+```
+
+If parsing still fails or the remote is not GitHub, ask the user for `OWNER/REPO`.
 
 ### 3) Force-cancel the run by ID (repeat 10x)
 
