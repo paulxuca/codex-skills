@@ -40,30 +40,56 @@ fi
 
 If parsing fails or the remote is not GitHub, ask the user for `OWNER/REPO`.
 
-### 3) Force-cancel the run by ID (repeat 10x)
+### 3) Force-cancel the run by ID (loop until 409)
 
 Use the run ID provided by the user:
 
 ```bash
 RUN_ID="21150788856"
-for _ in {1..10}; do
-  gh api \
-    --method POST \
-    -H "Accept: application/vnd.github+json" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    "/repos/$OWNER_REPO/actions/runs/$RUN_ID/force-cancel"
+while true; do
+  RESPONSE="$(
+    gh api \
+      --method POST \
+      --include \
+      -H "Accept: application/vnd.github+json" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      "/repos/$OWNER_REPO/actions/runs/$RUN_ID/force-cancel" 2>&1
+  )"
+  STATUS="$(printf '%s' "$RESPONSE" | awk 'toupper($0) ~ /^HTTP\\// {print $2; exit}')"
+  if [ -z "$STATUS" ]; then
+    echo "Could not read HTTP status from response"
+    echo "$RESPONSE"
+    exit 1
+  fi
+  if [ "$STATUS" = "409" ]; then
+    echo "Run already completed (HTTP 409). Stopping."
+    break
+  fi
 done
 ```
 
 If the user requests a normal cancel instead of force-cancel, swap the endpoint to:
 
 ```bash
-for _ in {1..10}; do
-  gh api \
-    --method POST \
-    -H "Accept: application/vnd.github+json" \
-    -H "X-GitHub-Api-Version: 2022-11-28" \
-    "/repos/$OWNER_REPO/actions/runs/$RUN_ID/cancel"
+while true; do
+  RESPONSE="$(
+    gh api \
+      --method POST \
+      --include \
+      -H "Accept: application/vnd.github+json" \
+      -H "X-GitHub-Api-Version: 2022-11-28" \
+      "/repos/$OWNER_REPO/actions/runs/$RUN_ID/cancel" 2>&1
+  )"
+  STATUS="$(printf '%s' "$RESPONSE" | awk 'toupper($0) ~ /^HTTP\\// {print $2; exit}')"
+  if [ -z "$STATUS" ]; then
+    echo "Could not read HTTP status from response"
+    echo "$RESPONSE"
+    exit 1
+  fi
+  if [ "$STATUS" = "409" ]; then
+    echo "Run already completed (HTTP 409). Stopping."
+    break
+  fi
 done
 ```
 
