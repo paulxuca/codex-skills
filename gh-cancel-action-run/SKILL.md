@@ -23,41 +23,22 @@ If this fails or the repo is not the target, stop and ask for the correct repo p
 
 ### 2) Derive owner/repo from `.git`
 
-Read the `origin` remote and extract `OWNER/REPO` from GitHub URLs (https or ssh):
-
-```bash
-REMOTE_URL="$(git config --get remote.origin.url)"
-OWNER_REPO="$(
-  python3 - <<'PY'
-import os, re, sys
-url = os.environ.get("REMOTE_URL", "")
-m = re.search(r"github\\.com[:/](.+?)(?:\\.git)?$", url)
-if not m:
-    sys.exit("Could not parse GitHub owner/repo from remote.origin.url")
-print(m.group(1))
-PY
-)"
-```
-
-If parsing fails or the remote is not GitHub, fall back to `git remote -v` and retry parsing:
+Read the `origin` remote from `git remote -v` and extract `OWNER/REPO` using shell tools:
 
 ```bash
 REMOTE_URL="$(
   git remote -v | awk '/^origin\\s/ {print $2; exit}'
 )"
 OWNER_REPO="$(
-  python3 - <<'PY'
-import os, re, sys
-url = os.environ.get("REMOTE_URL", "")
-m = re.search(r"github\\.com[:/](.+?)(?:\\.git)?$", url)
-if not m:
-    sys.exit("Could not parse GitHub owner/repo from git remote -v")
-print(m.group(1))
-PY
+  printf '%s' "$REMOTE_URL" | sed -E 's#^(git@|https://)github.com[:/](.+?)(\\.git)?$#\\2#'
 )"
+if [ -z "$OWNER_REPO" ] || [ "$OWNER_REPO" = "$REMOTE_URL" ]; then
+  echo "Could not parse GitHub owner/repo from git remote -v"
+  exit 1
+fi
 ```
 
-If parsing still fails or the remote is not GitHub, ask the user for `OWNER/REPO`.
+If parsing fails or the remote is not GitHub, ask the user for `OWNER/REPO`.
 
 ### 3) Force-cancel the run by ID (repeat 10x)
 
