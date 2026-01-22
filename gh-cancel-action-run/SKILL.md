@@ -27,10 +27,10 @@ Read the `origin` remote from `git remote -v` and extract `OWNER/REPO` using she
 
 ```bash
 REMOTE_URL="$(
-  git remote -v | awk '/^origin\\s/ {print $2; exit}'
+  git remote -v | awk '$1=="origin" {print $2; exit}'
 )"
 OWNER_REPO="$(
-  printf '%s' "$REMOTE_URL" | sed -E 's#^(git@|https://)github.com[:/](.+?)(\\.git)?$#\\2#'
+  printf '%s' "$REMOTE_URL" | perl -ne 'if (m{^(?:git@|https://)github.com[:/](.+?)(?:\\.git)?$}) {print $1}'
 )"
 if [ -z "$OWNER_REPO" ] || [ "$OWNER_REPO" = "$REMOTE_URL" ]; then
   echo "Could not parse GitHub owner/repo from git remote -v"
@@ -66,3 +66,7 @@ for _ in {1..10}; do
     "/repos/$OWNER_REPO/actions/runs/$RUN_ID/cancel"
 done
 ```
+
+### Failure handling notes
+
+- If the run is already completed, GitHub returns HTTP 409 with `Cannot cancel a workflow run that is completed.` This is expected; report that the run is already done.
